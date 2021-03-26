@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "978847092175",
+    "firebase_url": "https://catannow-20200-default-rtdb.firebaseio.com",
+    "project_id": "catannow-20200",
+    "storage_bucket": "catannow-20200.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:978847092175:android:4454af1f834842cdc896ba",
+        "android_client_info": {
+          "package_name": "com.example.catan_now"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "978847092175-jt7bdovme992p777l39sj8u10lkfd4b0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwt2puxLrBjj_z6jHnVB7beSdCPfENihA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "978847092175-jt7bdovme992p777l39sj8u10lkfd4b0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
