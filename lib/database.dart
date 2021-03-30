@@ -1,22 +1,27 @@
-import 'dart:io';
+import 'dart:async';
 
 import 'package:catan_now/player.dart';
-import 'package:device_info/device_info.dart';
+import 'package:catan_now/proposal.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 
 abstract class Database {
-  Future<Player> getCurrentPlayer();
-
-  void createRequest(Player player, DateTime dateTime);
+  abstract final RxList<Player> players;
+  abstract final RxList<Proposal> proposals;
+  Player createPlayer(String id);
+  Proposal createProposal(Player player, DateTime dateTime);
 }
 
 class CloudFirestoreDatabase extends Database {
   static const bool USE_FIRESTORE_EMULATOR = false;
 
-  late final QueryDocumentSnapshot defaultRoom;
+  late final DocumentReference defaultRoom;
+  late final CollectionReference playersRef;
+  late final CollectionReference proposalsRef;
+  final RxList<Player> players = <Player>[].obs;
+  final RxList<Proposal> proposals = <Proposal>[].obs;
 
   CloudFirestoreDatabase._(); // private constructor
 
@@ -33,56 +38,63 @@ class CloudFirestoreDatabase extends Database {
       FirebaseFirestore.instance.settings = const Settings(
           host: 'localhost:8080', sslEnabled: false, persistenceEnabled: false);
     }
+
     defaultRoom =
         (await FirebaseFirestore.instance.collection('gamerooms').get())
             .docs
-            .first;
+            .first
+            .reference;
+    playersRef = defaultRoom.collection("players");
+    proposalsRef = defaultRoom.collection("proposed");
+
+    updatePlayers(await playersRef.snapshots().first);
+    updateProposals(await proposalsRef.snapshots().first);
+    playersRef.snapshots().listen(updatePlayers);
+    proposalsRef.snapshots().listen(updateProposals);
   }
 
-  Future<Player> getCurrentPlayer() async {
-    var playersRef = defaultRoom.reference.collection("players");
-    var players = (await playersRef.get()).docs;
-    var info = await getDeviceInfo();
+  void updatePlayers(QuerySnapshot snapShots) {
+    // delete any removed players
+    var playerIds = snapShots.docs.map((x) => x.id);
+    players.removeWhere((x) => !playerIds.contains(x.id));
 
-    late DocumentReference currentPlayerRef;
-    try {
-      currentPlayerRef = players.singleWhere((x) => x.id == info).reference;
-    } catch (e) {
-      currentPlayerRef = playersRef.doc(info);
-    }
-
-    return await Player.fromReference(currentPlayerRef);
+    // add any new players
+    playerIds = players.map((s) => s.id);
+    var newPlayerRefs = snapShots.docs
+        .where((x) => !playerIds.contains(x.id))
+        .map((x) => x.reference);
+    players.addAll(newPlayerRefs.map(Player.fromReference));
   }
 
-  Future<String> getDeviceInfo() async {
-    final DeviceInfoPlugin deviceInfoPlugin = new DeviceInfoPlugin();
+  void updateProposals(QuerySnapshot snapShots) {
+    // TODO: for some reason we're not getting here
+    // when a new proposal is created
 
-    if (Platform.isAndroid) {
-      var build = await deviceInfoPlugin.androidInfo;
-      return build.androidId; //UUID for Android
-    } else if (Platform.isIOS) {
-      var data = await deviceInfoPlugin.iosInfo;
-      return data.identifierForVendor; //UUID for iOS
-    } else {
-      throw PlatformException(code: "Unexpected platform");
-    }
+    // delete any removed proposals
+    var proposalIds = snapShots.docs.map((x) => x.id);
+    proposals.removeWhere((x) => !proposalIds.contains(x.id));
+
+    // add any new proposalIds
+    proposalIds = proposals.map((s) => s.id);
+    var newProposalRefs = snapShots.docs
+        .where((x) => !proposalIds.contains(x.id))
+        .map((x) => x.reference);
+    proposals.addAll(newProposalRefs.map(Proposal.fromReference));
+  }
+
+  Player createPlayer(String id) {
+    var currentPlayerRef = playersRef.doc(id);
+    return Player.fromReference(currentPlayerRef);
   }
 
   @override
-  Future<void> createRequest(Player currentPlayer, DateTime datetime) async {
-    var proposedRef = defaultRoom.reference.collection("proposed");
-    var proposed = (await proposedRef.get()).docs;
+  Proposal createProposal(Player currentPlayer, DateTime datetime) {
+    var proposalRef = proposalsRef.doc();
+    proposalRef.set({
+      Proposal.keyOwner: currentPlayer.id,
+      Proposal.keyTimestamp: datetime,
+    });
 
-    DocumentReference proposalRef;
-    try {
-      proposalRef = proposed
-          .singleWhere((p) => p.data()!['owner'] == currentPlayer.reference.id)
-          .reference;
-    } catch (e) {
-      proposalRef = proposedRef.doc();
-      await proposalRef.set({"owner": currentPlayer.reference.id});
-    }
-
-    await proposalRef.update({'timestamp': datetime});
+    return Proposal.fromReference(proposalRef);
   }
 }

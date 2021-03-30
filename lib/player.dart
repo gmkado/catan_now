@@ -3,23 +3,32 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class Player {
-  Rx<Color> color;
+  final RxInt color = Colors.grey.value.obs;
+  final String id;
 
-  DocumentReference reference;
+  static const String keyColor = "color";
 
-  Player._(this.color, this.reference) {
-    color.listen((c) => this.reference.update({'color': c!.value}));
+  Player._(this.id);
+
+  static void updateFromSnapshot(Player player, DocumentSnapshot snapshot) {
+    try {
+      int color = snapshot.data()![keyColor];
+      print(
+          'Cloud color for ${snapshot.id} = ${player.color.value} -> ${color}');
+      player.color(color);
+    } catch (e) {
+      print("Failed to get color from player data: " + e.toString());
+    }
   }
 
-  static Future<Player> fromReference(DocumentReference reference) async {
-    var snapShot = await reference.get();
-    Color color;
-    try {
-      int colorInt = snapShot.data()!['color'];
-      color = Color(colorInt);
-    } catch (e) {
-      color = Colors.grey;
-    }
-    return Player._(color.obs, reference);
+  static Player fromReference(DocumentReference reference) {
+    final player = Player._(reference.id);
+
+    // subscribe to changes from cloud
+    reference.snapshots().listen((s) => updateFromSnapshot(player, s));
+
+    // subscribe to changes from user
+    player.color.listen((c) => reference.update({keyColor: c}));
+    return player;
   }
 }
