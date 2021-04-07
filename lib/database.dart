@@ -10,8 +10,8 @@ import 'package:get/get.dart';
 abstract class Database {
   abstract final RxList<Player> players;
   abstract final RxList<Proposal> proposals;
-  Player createPlayer(String id);
-  Proposal createProposal(Player player, DateTime dateTime);
+  Future<Player> createPlayer(String id);
+  Future<Proposal> createProposal(Player player, DateTime dateTime);
 }
 
 class CloudFirestoreDatabase extends Database {
@@ -55,46 +55,69 @@ class CloudFirestoreDatabase extends Database {
 
   void updatePlayers(QuerySnapshot snapShots) {
     // delete any removed players
-    var playerIds = snapShots.docs.map((x) => x.id);
-    players.removeWhere((x) => !playerIds.contains(x.id));
+    final localPlayerIds = players.map((x) => x.id);
+    final remotePlayerIds = snapShots.docs.map((x) => x.id);
+
+    final deletedPlayers =
+        players.where((x) => !remotePlayerIds.contains(x.id));
+
+    if (deletedPlayers.isNotEmpty) {
+      print("Cloud Players removed ${deletedPlayers.length}");
+      players.removeWhere((x) => deletedPlayers.contains(x));
+    }
 
     // add any new players
-    playerIds = players.map((s) => s.id);
-    var newPlayerRefs = snapShots.docs
-        .where((x) => !playerIds.contains(x.id))
-        .map((x) => x.reference);
-    players.addAll(newPlayerRefs.map(Player.fromReference));
+    final addedPlayers = snapShots.docs
+        .where((x) => !localPlayerIds.contains(x.id))
+        .map((x) => x.reference)
+        .map(Player.fromReference);
+    if (addedPlayers.isNotEmpty) {
+      print("Cloud Players added ${addedPlayers.length}");
+      players.addAll(addedPlayers);
+    }
   }
 
   void updateProposals(QuerySnapshot snapShots) {
-    // TODO: for some reason we're not getting here
-    // when a new proposal is created
+    // delete any removed players
+    final localProposalIds = proposals.map((x) => x.id);
+    final remoteProposalIds = snapShots.docs.map((x) => x.id);
 
-    // delete any removed proposals
-    var proposalIds = snapShots.docs.map((x) => x.id);
-    proposals.removeWhere((x) => !proposalIds.contains(x.id));
+    final deletedProposals =
+        proposals.where((x) => !remoteProposalIds.contains(x.id));
 
-    // add any new proposalIds
-    proposalIds = proposals.map((s) => s.id);
-    var newProposalRefs = snapShots.docs
-        .where((x) => !proposalIds.contains(x.id))
-        .map((x) => x.reference);
-    proposals.addAll(newProposalRefs.map(Proposal.fromReference));
+    if (deletedProposals.isNotEmpty) {
+      print("Cloud Proposal removed ${deletedProposals.length}");
+      proposals.removeWhere((x) => deletedProposals.contains(x));
+    }
+
+    // add any new players
+    final addedProposals = snapShots.docs
+        .where((x) => !localProposalIds.contains(x.id))
+        .map((x) => x.reference)
+        .map(Proposal.fromReference);
+    if (addedProposals.isNotEmpty) {
+      print("Cloud Proposals added ${addedProposals.length}");
+      proposals.addAll(addedProposals);
+    }
   }
 
-  Player createPlayer(String id) {
+  Future<Player> createPlayer(String id) async {
     var currentPlayerRef = playersRef.doc(id);
+    await currentPlayerRef.set({Player.keyColor: Player.defaultColor});
+
+    print("Local Players added $id");
     return Player.fromReference(currentPlayerRef);
   }
 
   @override
-  Proposal createProposal(Player currentPlayer, DateTime datetime) {
-    var proposalRef = proposalsRef.doc();
-    proposalRef.set({
+  Future<Proposal> createProposal(
+      Player currentPlayer, DateTime datetime) async {
+    var proposalRef = await proposalsRef.add({
       Proposal.keyOwner: currentPlayer.id,
       Proposal.keyTimestamp: datetime,
     });
 
+    print("Local Proposals added ${proposalRef.id}");
     return Proposal.fromReference(proposalRef);
   }
 }

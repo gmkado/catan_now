@@ -1,37 +1,84 @@
+import 'dart:async';
+
+import 'package:catan_now/player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 
 class Proposal {
+  final DocumentReference reference;
   late String owner;
   final String id;
+  final List<StreamSubscription> subscriptions = [];
   final Rx<DateTime> timestamp = DateTime.now().obs;
-
+  final RxMap<String, bool?> responses = <String, bool?>{}.obs;
   static const String keyTimestamp = "timestamp";
   static const String keyOwner = "owner";
+  static const String keyResponses = "responses";
 
-  Proposal._(this.id);
+  Proposal._(this.reference) : this.id = reference.id {
+    // subscribe to cloud changes
+    reference.snapshots().listen((s) {
+      unsubscribeFromLocalChanges();
+      updateFromSnapshot(s);
+      subscribeToLocalChanges();
+    });
+    subscribeToLocalChanges();
+  }
 
-  static void updateFromSnapshot(Proposal proposal, DocumentSnapshot snapshot) {
-    proposal.owner = snapshot.data()![keyOwner];
+  void updateFromSnapshot(DocumentSnapshot snapshot) {
+    final data = snapshot.data()!;
 
-    try {
-      Timestamp dt = snapshot.data()![keyTimestamp];
-      proposal.timestamp(dt.toDate());
-    } catch (e) {
-      // how to react here??
-      print("Failed to get timestamp from proposal data: " + e.toString());
+    if (data.containsKey(keyOwner)) owner = data[keyOwner];
+
+    if (data.containsKey(keyTimestamp)) {
+      DateTime dt = data[keyTimestamp].toDate();
+      if (dt != timestamp()) {
+        printChange(Proposal, id, keyTimestamp, dt, local: false);
+        timestamp(dt);
+      }
+    }
+
+    if (data.containsKey(keyResponses)) {
+      final r = Map<String, bool?>.from(data[keyResponses]);
+      printChange(Proposal, id, keyTimestamp, r, local: false);
+      responses(r);
     }
   }
 
-  static Proposal fromReference(DocumentReference reference) {
-    final proposal = Proposal._(reference.id);
-
-    // subscribe to cloud changes
-    reference.snapshots().listen((s) => updateFromSnapshot(proposal, s));
-
+  void subscribeToLocalChanges() {
     // subscribe to changes from user
-    proposal.timestamp.listen((ts) => reference.update({keyTimestamp: ts!}));
+    subscriptions.add(timestamp.listen((ts) {
+      printChange(Proposal, id, keyTimestamp, ts, local: true);
+      reference.update({keyTimestamp: ts!});
+    }));
 
-    return proposal;
+    subscriptions.add(responses.listen((r) {
+      printChange(Proposal, id, keyResponses, r, local: true);
+      reference.update({
+        keyResponses: r
+      }); // TODO: we have some cycling happening due to this https://stackoverflow.com/questions/54117311/background-concurrent-copying-gc-freed-flutter#:~:text=It%20means%20your%20app%20is,you%20need%20to%20fix%20it.
+    }));
+  }
+
+  void unsubscribeFromLocalChanges() {
+    subscriptions.forEach((element) => element.cancel());
+    subscriptions.clear();
+  }
+
+  static Proposal fromReference(DocumentReference reference) =>
+      Proposal._(reference);
+
+  /// Go from no-response (null) to accepted (true) to rejected (false)
+  void cycleResponse(Player player) {
+    switch (responses[player.id]) {
+      case true:
+        responses[player.id] = false;
+        break;
+      case false:
+        responses[player.id] = null;
+        break;
+      default:
+        responses[player.id] = true;
+    }
   }
 }

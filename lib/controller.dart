@@ -24,7 +24,7 @@ class Controller extends GetxController {
     try {
       player = players.singleWhere((x) => x.id == info);
     } catch (e) {
-      player = database.createPlayer(info);
+      player = await database.createPlayer(info);
     }
   }
 
@@ -35,7 +35,7 @@ class Controller extends GetxController {
   }
 
   Future<void> createProposal(DateTime dateTime) async {
-    database.createProposal(player, dateTime);
+    await database.createProposal(player, dateTime);
   }
 
   static Future<String> getDeviceInfo() async {

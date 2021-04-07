@@ -28,36 +28,67 @@ class ProposalView extends GetView<Controller> {
         height: 50,
         child: Row(
           children: [
-            Expanded(child: Text(proposal.timestamp.toString())),
+            Flexible(child: Text(proposal.timestamp.toString())),
             Expanded(
                 child: Obx(() => ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemBuilder: (context, index) => PlayerView(
-                        controller.players[index],
-                        onPressed: () => {},
-                      ),
+                      itemBuilder: (context, index)
+                      {
+                        final player = controller.players[index];
+                        return Obx(() => PlayerResponseView(player,
+                        response: proposal.responses.putIfAbsent(player.id, () => null),
+                        onPressed: onPressed));
+                      },
                       itemCount: controller.players.length,
                       // shrinkWrap: true,
                     )))
           ],
         ));
   }
+
+  void onPressed(Player player){
+    // only allow updates if we are the player
+    if(player == controller.player) {
+      proposal.cycleResponse(player);
+    }
+  }
+
 }
 
-class PlayerView extends GetView<Controller> {
+class PlayerResponseView extends GetView<Controller> {
   final Player player;
-  final void Function() onPressed;
+  final void Function(Player) onPressed;
+  final bool? response;
 
-  PlayerView(this.player, {required this.onPressed});
+  PlayerResponseView(this.player, {required this.response, required this.onPressed});
 
   @override
   Widget build(context) {
-    return Center(
+    return SizedBox(
+        width: 60,
         child: Obx(() => RawMaterialButton(
             shape: CircleBorder(),
-            child: Text(this.player.id[0]),
-            fillColor: Color(this.player.color()),
-            onPressed: onPressed)));
+            child: Text(getText()),
+            fillColor: getColor(),
+            onPressed: () => onPressed(player))));
+  }
+  String getText(){
+    switch(response) {
+      case true:
+        return "o";
+      case false:
+        return "x";
+      default:
+        return player.id[0];
+    }
+  }
+
+  Color getColor(){
+    var baseColor = Color(this.player.color());
+    if(response == null) {
+      return baseColor.withAlpha(100);
+    }
+    return baseColor;
   }
 }
 
@@ -116,7 +147,7 @@ class Home extends GetView<Controller> {
                   textColor: Colors.white,
                   padding: EdgeInsets.all(32),
                   child: Text("CATAN?"),
-                  onPressed: () => controller.createProposal(DateTime.now())))),
+                  onPressed: () async => await controller.createProposal(DateTime.now())))),
         ]));
   }
 }
