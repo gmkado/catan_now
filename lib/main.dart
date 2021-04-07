@@ -32,12 +32,11 @@ class ProposalView extends GetView<Controller> {
             Expanded(
                 child: Obx(() => ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemBuilder: (context, index)
-                      {
+                      itemBuilder: (context, index) {
                         final player = controller.players[index];
                         return Obx(() => PlayerResponseView(player,
-                        response: proposal.responses.putIfAbsent(player.id, () => null),
-                        onPressed: onPressed));
+                            response: player.responses[proposal.id],
+                            onPressed: onPressed));
                       },
                       itemCount: controller.players.length,
                       // shrinkWrap: true,
@@ -46,13 +45,26 @@ class ProposalView extends GetView<Controller> {
         ));
   }
 
-  void onPressed(Player player){
+  void onPressed(Player player) {
     // only allow updates if we are the player
-    if(player == controller.player) {
-      proposal.cycleResponse(player);
+    if (player == controller.player) {
+      cycleResponse(player);
     }
   }
 
+  /// Go from no-response to accepted (true) to rejected (false)
+  void cycleResponse(Player player) {
+    final responses = player.responses;
+
+    if (responses.containsKey(proposal.id)) {
+      if (responses[proposal.id]!)
+        responses[proposal.id] = false;
+      else
+        responses.remove(proposal.id);
+    } else {
+      responses[proposal.id] = true;
+    }
+  }
 }
 
 class PlayerResponseView extends GetView<Controller> {
@@ -60,7 +72,8 @@ class PlayerResponseView extends GetView<Controller> {
   final void Function(Player) onPressed;
   final bool? response;
 
-  PlayerResponseView(this.player, {required this.response, required this.onPressed});
+  PlayerResponseView(this.player,
+      {required this.response, required this.onPressed});
 
   @override
   Widget build(context) {
@@ -72,8 +85,9 @@ class PlayerResponseView extends GetView<Controller> {
             fillColor: getColor(),
             onPressed: () => onPressed(player))));
   }
-  String getText(){
-    switch(response) {
+
+  String getText() {
+    switch (response) {
       case true:
         return "o";
       case false:
@@ -83,9 +97,9 @@ class PlayerResponseView extends GetView<Controller> {
     }
   }
 
-  Color getColor(){
+  Color getColor() {
     var baseColor = Color(this.player.color());
-    if(response == null) {
+    if (response == null) {
       return baseColor.withAlpha(100);
     }
     return baseColor;
@@ -147,7 +161,8 @@ class Home extends GetView<Controller> {
                   textColor: Colors.white,
                   padding: EdgeInsets.all(32),
                   child: Text("CATAN?"),
-                  onPressed: () async => await controller.createProposal(DateTime.now())))),
+                  onPressed: () async =>
+                      await controller.createProposal(DateTime.now())))),
         ]));
   }
 }
