@@ -4,24 +4,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-mixin LocalStreamManager {
-  final List<StreamSubscription> subscriptions = [];
-  void unsubscribeFromLocalChanges() {
-    subscriptions.forEach((element) => element.cancel());
-    subscriptions.clear();
-  }
-
-  subscribeToLocalChanges();
-}
+import 'mixins.dart';
 
 class Player with LocalStreamManager {
-  final RxInt color = Player.defaultColor.obs;
-  final String id;
-  final DocumentReference reference;
-  final RxMap<String, bool> responses = <String, bool>{}.obs;
   static final int defaultColor = Colors.grey.value;
+  static const String defaultName = "";
   static const String keyColor = "color";
   static const String keyResponses = "responses";
+  static const String keyName = "responses";
+
+  final String id;
+  final DocumentReference reference;
+
+  final RxInt color = Player.defaultColor.obs;
+  final RxString name = Player.defaultName.obs;
+  final RxMap<String, bool> responses = <String, bool>{}.obs;
 
   Player._(this.reference) : id = reference.id {
     // subscribe to changes from cloud
@@ -34,20 +31,23 @@ class Player with LocalStreamManager {
     subscribeToLocalChanges();
   }
 
+  /// subscribe to changes from user
   @override
   void subscribeToLocalChanges() {
-    // subscribe to changes from user
-    StreamSubscription sub = color.listen((c) {
-      printChange(Player, id, keyColor, c, local: true);
-      reference.update({keyColor: c});
-    });
-    subscriptions.add(sub);
+    Function(dynamic) getUpdateFunction(key) {
+      void updateReference(value) {
+        printChange(Player, id, key, value, local: true);
+        reference.update({key: value});
+      }
 
-    sub = responses.listen((r) {
-      printChange(Player, id, keyResponses, r, local: true);
-      reference.update({keyResponses: r});
-    });
-    subscriptions.add(sub);
+      return updateReference;
+    }
+
+    subscriptions.add(color.listen(getUpdateFunction(keyColor)));
+
+    subscriptions.add(responses.listen(getUpdateFunction(keyResponses)));
+
+    subscriptions.add(name.listen(getUpdateFunction(keyName)));
   }
 
   void updateFromSnapshot(DocumentSnapshot snapshot) {

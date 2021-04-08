@@ -1,8 +1,8 @@
-import 'dart:async';
-
 import 'package:catan_now/player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
+
+import 'mixins.dart';
 
 /// TODO: removing a proposal should remove all references to it in Player.responses
 /// Or some cleanup needs to happen so we don't store unnecessary data
