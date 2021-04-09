@@ -23,7 +23,9 @@ class HeaderView extends GetView<Controller> {
   @override
   Widget build(context) {
     return Row(children: [
-      Expanded(flex: 1, child: Text("When?")),
+      Expanded(
+          flex: 1,
+          child: Text("When?", style: Theme.of(context).textTheme.subtitle2)),
       Expanded(
           flex: 1,
           child: Obx(() => Row(
@@ -33,7 +35,8 @@ class HeaderView extends GetView<Controller> {
                       width: 60,
                       child: Obx(() => RawMaterialButton(
                           shape: CircleBorder(),
-                          child: Text(getPlayerName(p)),
+                          child: Text(getPlayerName(p),
+                              style: Theme.of(context).textTheme.subtitle2),
                           fillColor: Color(p.color.value),
                           onPressed: () => {}))))
                   .toList()))),
@@ -49,26 +52,30 @@ class ProposalView extends GetView<Controller> {
   ProposalView(this.proposal);
 
   @override
-  Widget build(context) {
-    return SizedBox(
-        height: 50,
-        child: Row(
-          children: [
-            Expanded(child: Text(getTimeString()), flex: 1),
-            Expanded(
-              flex: 1,
-              child: Obx(() => Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: controller.players
-                        .map((p) => Obx(() => PlayerResponseView(p,
-                            response: p.responses[proposal.id],
-                            onPressed: onPressed)))
-                        .toList(),
-                  )),
-            )
-          ],
-        ));
-  }
+  Widget build(context) => SizedBox(
+      height: 50,
+      child: Row(
+        children: [
+          Expanded(child: buildTime(), flex: 1),
+          Expanded(
+            flex: 1,
+            child: Obx(() => Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: controller.players
+                      .map((p) => Obx(() => PlayerResponseView(p,
+                          response: p.responses[proposal.id],
+                          onPressed: onPressed)))
+                      .toList(),
+                )),
+          )
+        ],
+      ));
+
+  Text buildTime() => Text(getTimeString(),
+      style: TextStyle(
+          fontWeight: proposal.owner() == controller.player.id
+              ? FontWeight.bold
+              : FontWeight.normal));
 
   String getTimeString() {
     var time = proposal.timestamp()!;
@@ -200,8 +207,20 @@ class Home extends GetView<Controller> {
               child: Center(
                   child: Obx(() => ListView.builder(
                       itemCount: controller.proposals.length,
-                      itemBuilder: (context, index) =>
-                          ProposalView(controller.proposals[index]))))),
+                      itemBuilder: (context, index) {
+                        final proposal = controller.proposals[index];
+                        final view = ProposalView(proposal);
+                        return Obx(
+                            () => proposal.owner() == controller.player.id
+                                ? Dismissible(
+                                    background: Container(color: Colors.red),
+                                    key: Key(proposal.id),
+                                    child: view,
+                                    onDismissed: (_) async =>
+                                        await proposal.reference.delete(),
+                                  )
+                                : view);
+                      })))),
           Center(
               child: Obx(() => MaterialButton(
                   shape: CircleBorder(),

@@ -8,7 +8,7 @@ import 'mixins.dart';
 /// Or some cleanup needs to happen so we don't store unnecessary data
 class Proposal with LocalStreamManager {
   final DocumentReference reference;
-  late String owner;
+  final RxString owner = "".obs;
   final String id;
   final Rx<DateTime> timestamp = DateTime.now().obs;
   static const String keyTimestamp = "timestamp";
@@ -25,9 +25,13 @@ class Proposal with LocalStreamManager {
   }
 
   void updateFromSnapshot(DocumentSnapshot snapshot) {
-    final data = snapshot.data()!;
+    final data = snapshot.data();
+    if (data == null) {
+      // null means we got deleted, do nothing
+      return;
+    }
 
-    if (data.containsKey(keyOwner)) owner = data[keyOwner];
+    if (data.containsKey(keyOwner)) owner(data[keyOwner]);
 
     if (data.containsKey(keyTimestamp)) {
       DateTime dt = data[keyTimestamp].toDate();

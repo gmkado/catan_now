@@ -117,6 +117,8 @@ class CloudFirestoreDatabase extends Database {
       Proposal.keyTimestamp: datetime,
     });
 
+    // we should be accepting this time by default since we're creating it
+    currentPlayer.responses[proposalRef.id] = true;
     print("Local Proposals added ${proposalRef.id}");
     return Proposal.fromReference(proposalRef);
   }
