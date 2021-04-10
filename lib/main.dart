@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import 'bindings.dart';
 import 'controller.dart';
+import 'expandable.dart';
 
 void main() async {
   var bindings = HomeBindings();
@@ -70,23 +71,12 @@ class ProposalView extends GetView<Controller> {
           )
         ],
       ));
-
-  Text buildTime() => Text(getTimeString(),
+  final formatter = DateFormat('jm');
+  Text buildTime() => Text(formatter.format(proposal.timestamp()!),
       style: TextStyle(
           fontWeight: proposal.owner() == controller.player.id
               ? FontWeight.bold
               : FontWeight.normal));
-
-  String getTimeString() {
-    var time = proposal.timestamp()!;
-    var newMinute = (time.minute / 15).round() * 15;
-    var newHour = newMinute == 60 ? time.hour + 1 : time.hour;
-    var displayTime = new DateTime(time.year, time.month, time.day, newHour,
-        newMinute, time.second, time.millisecond, time.microsecond);
-
-    final formatter = DateFormat('jm');
-    return formatter.format(displayTime);
-  }
 
   void onPressed(Player player) {
     // only allow updates if we are the player
@@ -124,19 +114,19 @@ class PlayerResponseView extends GetView<Controller> {
         width: 60,
         child: Obx(() => RawMaterialButton(
             shape: CircleBorder(),
-            child: Text(getText()),
+            child: getIcon(),
             fillColor: getColor(),
             onPressed: () => onPressed(player))));
   }
 
-  String getText() {
+  Widget getIcon() {
     switch (response) {
       case true:
-        return "o";
+        return Icon(Icons.check);
       case false:
-        return "x";
+        return Text("X");
       default:
-        return "?";
+        return Text("?");
     }
   }
 
@@ -192,44 +182,72 @@ class Home extends GetView<Controller> {
   @override
   Widget build(context) {
     return Scaffold(
-        appBar: AppBar(
-          title: Text("Who wants to play Catan?"),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.edit),
-              onPressed: () => Get.to(() => EditPlayer()),
-            )
-          ],
-        ),
-        body: Column(children: [
-          SizedBox(height: 60, child: HeaderView()),
-          Expanded(
-              child: Center(
-                  child: Obx(() => ListView.builder(
-                      itemCount: controller.proposals.length,
-                      itemBuilder: (context, index) {
-                        final proposal = controller.proposals[index];
-                        final view = ProposalView(proposal);
-                        return Obx(
-                            () => proposal.owner() == controller.player.id
-                                ? Dismissible(
-                                    background: Container(color: Colors.red),
-                                    key: Key(proposal.id),
-                                    child: view,
-                                    onDismissed: (_) async =>
-                                        await proposal.reference.delete(),
-                                  )
-                                : view);
-                      })))),
-          Center(
-              child: Obx(() => MaterialButton(
-                  shape: CircleBorder(),
-                  color: Color(controller.player.color()),
-                  textColor: Colors.white,
-                  padding: EdgeInsets.all(32),
-                  child: Text("CATAN?"),
-                  onPressed: () async =>
-                      await controller.createProposal(DateTime.now())))),
-        ]));
+      appBar: AppBar(
+        title: Text("Who wants to play Catan?"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.edit),
+            onPressed: () => Get.to(() => EditPlayer()),
+          )
+        ],
+      ),
+      body: Column(children: [
+        SizedBox(height: 60, child: HeaderView()),
+        Expanded(
+            child: Center(
+                child: Obx(() => ListView.builder(
+                    itemCount: controller.proposals.length,
+                    itemBuilder: (context, index) {
+                      final proposal = controller.proposals[index];
+                      final view = ProposalView(proposal);
+                      return Obx(() => proposal.owner() == controller.player.id
+                          ? Dismissible(
+                              background: Container(color: Colors.red),
+                              key: Key(proposal.id),
+                              child: view,
+                              onDismissed: (_) async =>
+                                  await proposal.reference.delete(),
+                            )
+                          : view);
+                    })))),
+        Center(
+            child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Obx(() => MaterialButton(
+                    shape: CircleBorder(),
+                    color: Color(controller.player.color()),
+                    textColor: Colors.white,
+                    padding: EdgeInsets.all(32),
+                    child: Icon(CupertinoIcons.hexagon),
+                    onLongPress: () async {
+                      var time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay(hour: 10, minute: 47),
+                        builder: (BuildContext context, Widget? child) {
+                          return MediaQuery(
+                            data: MediaQuery.of(context)
+                                .copyWith(alwaysUse24HourFormat: true),
+                            child: child!,
+                          );
+                        },
+                      );
+
+                      if (time == null) return;
+                      var dt = DateTime.now();
+                      await controller.createProposal(DateTime(
+                          dt.year, dt.month, dt.day, time.hour, time.minute));
+                    },
+                    onPressed: () async =>
+                        await controller.createProposal(getTimeString()))))),
+      ]),
+    );
+  }
+
+  DateTime getTimeString() {
+    var dt = DateTime.now();
+    var newMinute = (dt.minute / 15).round() * 15;
+    var newHour = newMinute == 60 ? dt.hour + 1 : dt.hour;
+    return new DateTime(dt.year, dt.month, dt.day, newHour, newMinute,
+        dt.second, dt.millisecond, dt.microsecond);
   }
 }
