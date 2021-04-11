@@ -234,20 +234,42 @@ class Home extends GetView<Controller> {
 
                       if (time == null) return;
                       var dt = DateTime.now();
-                      await controller.createProposal(DateTime(
+                      await createProposal(DateTime(
                           dt.year, dt.month, dt.day, time.hour, time.minute));
                     },
                     onPressed: () async =>
-                        await controller.createProposal(getTimeString()))))),
+                        await createProposal(getTimeString()))))),
       ]),
     );
+  }
+
+  Future createProposal(DateTime dt) async {
+    try {
+      // check if a proposal for this datetime already exists
+      var existing =
+          controller.proposals.firstWhere((p) => p.timestamp() == dt);
+
+      if (controller.player.responses[existing.id] ?? false) {
+        Get.defaultDialog(
+            middleText: "You've already accepted a proposal for this time");
+      } else {
+        Get.defaultDialog(
+            middleText: "A proposal already exists for ${dt.toString()}" +
+                "\n\nDo you want to accept that one instead?",
+            onConfirm: () {
+              controller.player.responses[existing.id] = true;
+              Get.back();
+            });
+      }
+    } catch (StateError) {
+      await controller.createProposal(dt);
+    }
   }
 
   DateTime getTimeString() {
     var dt = DateTime.now();
     var newMinute = (dt.minute / 15).round() * 15;
     var newHour = newMinute == 60 ? dt.hour + 1 : dt.hour;
-    return new DateTime(dt.year, dt.month, dt.day, newHour, newMinute,
-        dt.second, dt.millisecond, dt.microsecond);
+    return new DateTime(dt.year, dt.month, dt.day, newHour, newMinute);
   }
 }
