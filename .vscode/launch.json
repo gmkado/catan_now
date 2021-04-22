@@ -15,6 +15,12 @@
             "request": "launch",
             "type": "dart",
             "args":["-d", "emulator-5554"]
+        },
+        {
+            "name": "emulator2",
+            "request": "launch",
+            "type": "dart",
+            "args":["-d", "emulator-5556"]
         }
     ]
 }
