@@ -37,7 +37,7 @@ class HeaderView extends GetView<Controller> {
           child: Obx(() => Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: controller.players
-                  .where((p) => p != controller.currentPlayer)
+                  .where((p) => p.id != controller.currentPlayer.id)
                   .map((p) => PlayerIconWidget(p))
                   .toList())))
     ]);
@@ -55,14 +55,14 @@ class PlayerIconWidget extends GetView<Controller> {
         width: controller.iconSize,
         child: Obx(() => RawMaterialButton(
             shape: CircleBorder(),
-            child: Text(getPlayerName(),
+            child: Text(player.name()!,
                 style: Theme.of(context).textTheme.subtitle2),
             fillColor: getColor(player, highlight: true),
-            onPressed: () => {})));
+            onPressed: () => {
+                  if (controller.currentPlayerId == player.id)
+                    {Get.to(() => EditPlayerName())}
+                })));
   }
-
-  String getPlayerName() =>
-      player.name.value! == "" ? player.id[0] : player.name.value!;
 }
 
 class ProposalView extends GetView<Controller> {
@@ -70,31 +70,36 @@ class ProposalView extends GetView<Controller> {
   ProposalView(this.proposal);
 
   @override
-  Widget build(context) => SizedBox(
-      height: controller.iconSize,
-      child: Row(
-        children: [
-          Expanded(child: buildTime(), flex: 1),
-          Expanded(child: CurrentPlayerResponseView(proposal), flex: 2),
-          Expanded(
-            flex: 3,
-            child: Obx(() => Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: controller.players
-                      .where((p) => p != controller.currentPlayer)
-                      .map((p) => Obx(() => PlayerResponseView(p,
-                          response: p.responses[proposal.id])))
-                      .toList(),
-                )),
-          )
-        ],
-      ));
-  final formatter = DateFormat('jm');
-  Text buildTime() => Text(formatter.format(proposal.timestamp()!),
-      style: TextStyle(
-          fontWeight: proposal.owner() == controller.currentPlayerId
-              ? FontWeight.bold
-              : FontWeight.normal));
+  Widget build(context) {
+    final formatter = DateFormat('jm');
+    return SizedBox(
+        height: controller.iconSize,
+        child: Row(
+          children: [
+            Expanded(
+                child: Obx(() => Text(formatter.format(proposal.timestamp()!),
+                    style: TextStyle(
+                        fontWeight:
+                            proposal.owner() == controller.currentPlayerId
+                                ? FontWeight.bold
+                                : FontWeight.normal))),
+                flex: 1),
+            Expanded(child: CurrentPlayerResponseView(proposal), flex: 2),
+            Expanded(
+              flex: 3,
+              child: Obx(() => Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: controller.players
+                        .where((p) => p.id != controller.currentPlayer.id)
+                        .map((p) => Obx(() => PlayerResponseView(p,
+                            response: proposal
+                                .responses[p.id]))) // null == no response
+                        .toList(),
+                  )),
+            )
+          ],
+        ));
+  }
 }
 
 class CurrentPlayerResponseView extends GetView<Controller> {
@@ -129,11 +134,11 @@ class ResponseButtonView extends GetView<Controller> {
   }
 
   void toggleResponse() => isSelected()
-      ? controller.currentPlayer.responses.remove(proposal.id)
-      : controller.currentPlayer.responses[proposal.id] = response;
+      ? proposal.responses.remove(controller.currentPlayer.id)
+      : proposal.responses[controller.currentPlayer.id] = response;
 
   bool isSelected() =>
-      response == controller.currentPlayer.responses[proposal.id];
+      response == proposal.responses[controller.currentPlayer.id];
 }
 
 class PlayerResponseView extends GetView<Controller> {
@@ -169,22 +174,14 @@ Widget getIconForResponse(bool? response) {
 Color getColor(Player player, {required bool highlight}) =>
     Color(player.color()).withAlpha(highlight ? 255 : 50);
 
-class EditPlayer extends GetView<Controller> {
-  final textController = TextEditingController();
-
+class EditPlayerColor extends GetView<Controller> {
   @override
   Widget build(context) {
     var color = Color(controller.currentPlayer.color());
-    textController.text = controller.currentPlayer.name()!;
     return AlertDialog(
-      title: const Text('Edit Player'),
+      title: const Text('Pick a color'),
       content: Column(
         children: [
-          TextFormField(
-              controller: textController,
-              decoration: InputDecoration(
-                  border: UnderlineInputBorder(),
-                  labelText: 'Enter your name')),
           SingleChildScrollView(
               child: BlockPicker(
             pickerColor: color,
@@ -199,6 +196,35 @@ class EditPlayer extends GetView<Controller> {
           child: const Text('Save'),
           onPressed: () {
             controller.currentPlayer.color(color.value);
+            Get.back();
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class EditPlayerName extends GetView<Controller> {
+  final textController = TextEditingController();
+
+  @override
+  Widget build(context) {
+    textController.text = controller.currentPlayer.name()!;
+    return AlertDialog(
+      title: const Text('Enter a Name'),
+      content: Column(
+        children: [
+          TextFormField(
+              controller: textController,
+              decoration: InputDecoration(
+                  border: UnderlineInputBorder(),
+                  labelText: 'Enter your name')),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          child: const Text('Save'),
+          onPressed: () {
             controller.currentPlayer.name(textController.text);
             Get.back();
           },
@@ -217,7 +243,7 @@ class Home extends GetView<Controller> {
         actions: [
           IconButton(
             icon: Icon(Icons.edit),
-            onPressed: () => Get.to(() => EditPlayer()),
+            onPressed: () => Get.to(() => EditPlayerColor()),
           )
         ],
       ),
@@ -269,7 +295,7 @@ class Home extends GetView<Controller> {
                           dt.year, dt.month, dt.day, time.hour, time.minute));
                     },
                     onPressed: () async =>
-                        await createProposal(getTimeString()))))),
+                        await createProposal(getRoundedTime()))))),
       ]),
     );
   }
@@ -280,7 +306,7 @@ class Home extends GetView<Controller> {
       var existing =
           controller.proposals.firstWhere((p) => p.timestamp() == dt);
 
-      if (controller.currentPlayer.responses[existing.id] ?? false) {
+      if (existing.responses[controller.currentPlayer.id] ?? false) {
         Get.defaultDialog(
             middleText: "You've already accepted a proposal for this time");
       } else {
@@ -288,19 +314,19 @@ class Home extends GetView<Controller> {
             middleText: "A proposal already exists for ${dt.toString()}" +
                 "\n\nDo you want to accept that one instead?",
             onConfirm: () {
-              controller.currentPlayer.responses[existing.id] = true;
+              existing.responses[controller.currentPlayer.id] = true;
               Get.back();
             });
       }
     } catch (StateError) {
+      // no matching proposal exists, create a new one
       await controller.createProposal(dt);
     }
   }
 
-  DateTime getTimeString() {
+  DateTime getRoundedTime() {
     var dt = DateTime.now();
     var newMinute = (dt.minute / 15).round() * 15;
-    var newHour = newMinute == 60 ? dt.hour + 1 : dt.hour;
-    return new DateTime(dt.year, dt.month, dt.day, newHour, newMinute);
+    return new DateTime(dt.year, dt.month, dt.day, dt.hour, newMinute);
   }
 }

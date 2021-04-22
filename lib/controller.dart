@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 
 class Controller extends GetxController {
-  static const bool USE_FIRESTORE_EMULATOR = false;
+  static const bool USE_FIRESTORE_EMULATOR = true;
 
   late final DocumentReference defaultRoom;
   late final CollectionReference playersRef;
@@ -35,10 +35,13 @@ class Controller extends GetxController {
   Future<void> init() async {
     WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp();
+
+    currentPlayerId = await getDeviceInfo();
     if (USE_FIRESTORE_EMULATOR) {
-      // This only works for emulator, not real device
-      // See https://firebase.flutter.dev/docs/firestore/usage/#emulator-usage
-      var host = '10.0.2.2:8080';
+      // HACK: hardcode my pixel 3a device id
+      var host = currentPlayerId == "1de9723596c0795c"
+          ? '192.168.86.228:8080' // https://stackoverflow.com/a/4779992/3525158
+          : '10.0.2.2:8080'; // https://firebase.flutter.dev/docs/firestore/usage/#emulator-usage
       FirebaseFirestore.instance.settings =
           Settings(host: host, sslEnabled: false, persistenceEnabled: false);
     }
@@ -64,7 +67,6 @@ class Controller extends GetxController {
     updatePlayers(await playersRef.snapshots().first);
     updateProposals(await proposalsRef.snapshots().first);
 
-    currentPlayerId = await getDeviceInfo();
     try {
       currentPlayer = players.singleWhere((x) => x.id == currentPlayerId);
     } catch (e) {
@@ -128,20 +130,16 @@ class Controller extends GetxController {
     var currentPlayerRef = playersRef.doc(id);
     await currentPlayerRef.set({Player.keyColor: Player.defaultColor});
 
-    print("Local Players added $id");
     return Player.fromReference(currentPlayerRef);
   }
 
-  @override
   Future<Proposal> createProposal(DateTime datetime) async {
     var proposalRef = await proposalsRef.add({
       Proposal.keyOwner: currentPlayer.id,
       Proposal.keyTimestamp: datetime,
+      Proposal.keyResponses: {currentPlayer.id: true}
     });
 
-    // we should be accepting this time by default since we're creating it
-    currentPlayer.responses[proposalRef.id] = true;
-    print("Local Proposals added ${proposalRef.id}");
     return Proposal.fromReference(proposalRef);
   }
 

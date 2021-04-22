@@ -1,6 +1,17 @@
 import 'dart:async';
 
-mixin LocalStreamManager {
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+abstract class LocalStreamManager {
+  LocalStreamManager(DocumentReference reference) {
+    reference.snapshots().listen((s) {
+      unsubscribeFromLocalChanges();
+      updateFromSnapshot(s);
+      subscribeToLocalChanges();
+    });
+    subscribeToLocalChanges();
+  }
+
   final List<StreamSubscription> subscriptions = [];
   void unsubscribeFromLocalChanges() {
     subscriptions.forEach((element) => element.cancel());
@@ -8,4 +19,5 @@ mixin LocalStreamManager {
   }
 
   subscribeToLocalChanges();
+  updateFromSnapshot(DocumentSnapshot snapshot);
 }

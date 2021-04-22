@@ -12,7 +12,7 @@ to pickup changes to the functions stored in `index.js` (see https://stackoverfl
 `npm run build`
 
 better yet, watch for changes: https://firebase.googleblog.com/2018/01/streamline-typescript-development-cloud-functions.html
-
+`Tasks -> Run Build Task..., then choosing "tsc: watch"`
 
 to get app writing to local instance instead of cloud:
 database.dart -> `USE_FIRESTORE_EMULATOR = true`
