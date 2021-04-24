@@ -12,14 +12,24 @@ class Proposal extends LocalStreamManager {
   final String id;
   final Rx<DateTime> timestamp = DateTime.now().obs;
   final RxMap<String, bool> responses = <String, bool>{}.obs;
+  final RxBool gameCriteriaMet = false.obs;
 
+  static const int gameCriteria = 4;
+  static const String keyGameCriteriaMet = "criteriaMet";
   static const String keyTimestamp = "timestamp";
   static const String keyResponses = "responses";
   static const String keyOwner = "owner";
 
   Proposal._(this.reference)
       : this.id = reference.id,
-        super(reference);
+        super(reference) {
+    // Listen to changes in response and update our game criteria met flag if
+    // enough players have accepted
+    responses.listen((r) {
+      final accepted = r.values.where((x) => x);
+      gameCriteriaMet(accepted.length >= gameCriteria);
+    });
+  }
 
   void updateFromSnapshot(DocumentSnapshot snapshot) {
     final data = snapshot.data();
@@ -39,6 +49,10 @@ class Proposal extends LocalStreamManager {
       final r = Map<String, bool>.from(data[keyResponses]);
       responses(r);
     }
+
+    if (data.containsKey(keyGameCriteriaMet)) {
+      gameCriteriaMet(data[keyGameCriteriaMet]);
+    }
   }
 
   @override
@@ -48,6 +62,8 @@ class Proposal extends LocalStreamManager {
         .add(timestamp.listen((ts) => reference.update({keyTimestamp: ts!})));
     subscriptions
         .add(responses.listen((r) => reference.update({keyResponses: r})));
+    subscriptions.add(gameCriteriaMet
+        .listen((gcm) => reference.update({keyGameCriteriaMet: gcm})));
   }
 
   static Proposal fromReference(DocumentReference reference) =>

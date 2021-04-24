@@ -25,9 +25,7 @@ class HeaderView extends GetView<Controller> {
   @override
   Widget build(context) {
     return Row(children: [
-      Expanded(
-          flex: 1,
-          child: Text("When?", style: Theme.of(context).textTheme.subtitle2)),
+      Expanded(flex: 1, child: Container()),
       Expanded(
         flex: 2,
         child: PlayerIconWidget(controller.currentPlayer),
@@ -133,9 +131,12 @@ class ResponseButtonView extends GetView<Controller> {
             onPressed: toggleResponse)));
   }
 
-  void toggleResponse() => isSelected()
-      ? proposal.responses.remove(controller.currentPlayer.id)
-      : proposal.responses[controller.currentPlayer.id] = response;
+  void toggleResponse() {
+    print("toggling " + proposal.id);
+    isSelected()
+        ? proposal.responses.remove(controller.currentPlayer.id)
+        : proposal.responses[controller.currentPlayer.id] = response;
+  }
 
   bool isSelected() =>
       response == proposal.responses[controller.currentPlayer.id];
@@ -255,17 +256,27 @@ class Home extends GetView<Controller> {
                     itemCount: controller.proposals.length,
                     itemBuilder: (context, index) {
                       final proposal = controller.proposals[index];
-                      final view = ProposalView(proposal);
-                      return Obx(
-                          () => proposal.owner() == controller.currentPlayer.id
-                              ? Dismissible(
-                                  background: Container(color: Colors.red),
-                                  key: Key(proposal.id),
-                                  child: view,
-                                  onDismissed: (_) async =>
-                                      await proposal.reference.delete(),
-                                )
-                              : view);
+
+                      return Obx(() {
+                        Widget view = ProposalView(proposal);
+                        if (proposal.owner() == controller.currentPlayer.id) {
+                          view = Dismissible(
+                            background: Container(color: Colors.red),
+                            key: Key(proposal.id),
+                            child: view,
+                            onDismissed: (_) async =>
+                                await proposal.reference.delete(),
+                          );
+                        }
+                        if (proposal.gameCriteriaMet()!) {
+                          view = Container(
+                            child: view,
+                            decoration: BoxDecoration(
+                                border: Border.all(color: Colors.green)),
+                          );
+                        }
+                        return view;
+                      });
                     })))),
         Center(
             child: Padding(

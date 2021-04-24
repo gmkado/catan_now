@@ -4,6 +4,7 @@ admin.initializeApp({
   credential: admin.credential.applicationDefault(),
   databaseURL: "https://catannow-20200-default-rtdb.firebaseio.com",
 });
+
 // Start writing Firebase Functions
 // https://firebase.google.com/docs/functions/typescript
 
@@ -13,9 +14,16 @@ export var proposalChange = functions.firestore
     try {
       if (change.after.exists) {
         // new or updated
-        // check if game condition
-        change.after.data[]
-        sendNotification(context.params.roomId, "New proposal", "lalala");
+        var gametime = change.after.data()?.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        if(!change.before.exists) {
+          // new proposal, send notification
+          sendNotification(context.params.roomId, "New proposal", "Catan at " + gametime + "?");
+        }
+        else if(change.after.data()?.criteriaMet != change.before.data()?.criteriaMet
+          && change.after.data()?.criteriaMet){
+          // game criteria met!
+          sendNotification(context.params.roomId, "Gametime!", "We hit critical mass for " + gametime + "!");          
+        }
       } else {
         console.log("Deleted", context.params.proposalId);
       }
